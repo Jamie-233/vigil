@@ -24,6 +24,12 @@ targets ──▶ │ scheduler ─▶ probes ─▶ state machine ─▶ notifi
 
 Ping-based monitors answer one question — *is it routed?* — and alert on every lost packet. Real outages are more varied (the port is open but the app returns 500; the record resolves but to the wrong address; the certificate expires on Monday), and alerts that fire on noise get muted, which is worse than no monitoring at all. Vigil checks each layer separately and only changes state when the evidence is consistent.
 
+## Why not...
+
+- **...Prometheus with the Blackbox Exporter?** That is the standard answer, and if you already run Prometheus, Alertmanager and Grafana it is the better one. Vigil is for the case where you want one process, no database server and no extra services, with hysteresis, flap detection and SLO tracking built in. It also serves `/metrics`, so it can feed a Prometheus later.
+- **...Zabbix or a hosted status service?** Those cover far more (agents, SNMP, templates, user management, hosted probes from several regions). Vigil probes from a single vantage point and does not try to be a platform.
+- **...asking an LLM?** A model cannot produce availability or latency data; it can only interpret data something else measured. Vigil is that measurement layer.
+
 ## Features
 
 | | |
@@ -103,6 +109,17 @@ targets:
 - **Alert delivery is decoupled.** Webhooks run on their own bounded queue; a dead chat endpoint can never stall probing.
 - **SQLite in WAL mode.** A few writes per second is nothing for SQLite, and WAL lets the dashboard read while probes write, so slow queries can't create gaps in the data.
 - **SSE over WebSockets.** One-way data, automatic reconnect, and it survives corporate proxies that break WebSocket upgrades.
+
+## What has been verified
+
+| Area | How | Not yet |
+|---|---|---|
+| State machine: hysteresis, flap detection, percentiles, error budget, failures counting against the latency SLO | unit tests | - |
+| TCP (open versus refused), HTTP (status, body, timeout) probes | tests against local servers | - |
+| ICMP and DNS probes | - | **no automated test** |
+| Scheduler, SQLite store, downsampling, Prometheus output, API, SSE | tests | - |
+| Webhook retry and rate-limit handling | test against a fake endpoint | not against Slack or Discord |
+| Behaviour under load: number of targets, CPU and memory, scheduling lag | - | **not measured**, so the "single process" claim has no numbers yet |
 
 ## Development
 
