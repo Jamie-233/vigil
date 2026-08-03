@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "vigil"
+version = "0.1.0"
+description = "Self-hosted network monitoring: async ICMP/TCP/HTTP/DNS probes, flap-resistant alerting, SLO tracking, Prometheus metrics and a live dashboard in one process."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Jamie" }]
+dependencies = [
+    "aiohttp>=3.9",
+    "icmplib>=3.0",
+    "dnspython>=2.6",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "pytest-asyncio>=0.23"]
+
+[project.scripts]
+vigil = "vigil.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+vigil = ["static/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+asyncio_mode = "auto"
