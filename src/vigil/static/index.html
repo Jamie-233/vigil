@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vigil</title>
+<style>
+  :root {
+    --bg: #0b0d10; --panel: #12161b; --line: #1f262e; --text: #d7dde4; --muted: #7d8894;
+    --up: #3ddc84; --down: #ff5c5c; --warn: #ffb547; --unknown: #5c6670; --accent: #6ab0ff;
+    --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: light) {
+    :root { --bg: #f5f6f8; --panel: #fff; --line: #e3e6ea; --text: #15191e; --muted: #66707b;
+            --up: #12a150; --down: #d93636; --warn: #c97a00; --unknown: #9aa3ad; --accent: #2167d1; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+  header { display: flex; align-items: center; gap: 16px; padding: 14px 20px;
+           border-bottom: 1px solid var(--line); position: sticky; top: 0; background: var(--bg); z-index: 2; }
+  h1 { font: 600 15px var(--mono); letter-spacing: .08em; margin: 0; }
+  h1 span { color: var(--muted); font-weight: 400; }
+  .totals { display: flex; gap: 14px; font: 13px var(--mono); color: var(--muted); }
+  .totals b { color: var(--text); }
+  .spacer { flex: 1; }
+  .live { font: 12px var(--mono); color: var(--muted); display: flex; align-items: center; gap: 6px; }
+  .live i { width: 7px; height: 7px; border-radius: 50%; background: var(--unknown); }
+  .live.on i { background: var(--up); box-shadow: 0 0 0 3px color-mix(in srgb, var(--up) 25%, transparent); }
+  select { background: var(--panel); color: var(--text); border: 1px solid var(--line);
+           border-radius: 6px; padding: 5px 8px; font: 13px var(--mono); }
+  main { padding: 20px; max-width: 1280px; margin: 0 auto; display: grid; gap: 20px; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  .panel h2 { font: 600 12px var(--mono); text-transform: uppercase; letter-spacing: .1em;
+              color: var(--muted); margin: 0; padding: 12px 16px; border-bottom: 1px solid var(--line); }
+  table { width: 100%; border-collapse: collapse; }
+  th { text-align: left; font: 500 11px var(--mono); color: var(--muted); text-transform: uppercase;
+       letter-spacing: .06em; padding: 8px 12px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  td { padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+  tr:last-child td { border-bottom: 0; }
+  tr.flash td { animation: flash .8s ease-out; }
+  @keyframes flash { from { background: color-mix(in srgb, var(--accent) 12%, transparent); } }
+  .num { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+  .name { font-weight: 600; }
+  .addr { font: 12px var(--mono); color: var(--muted); }
+  .pill { display: inline-flex; align-items: center; gap: 6px; font: 600 11px var(--mono);
+          text-transform: uppercase; padding: 3px 8px; border-radius: 99px; }
+  .pill::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .pill.up { color: var(--up); background: color-mix(in srgb, var(--up) 12%, transparent); }
+  .pill.down { color: var(--down); background: color-mix(in srgb, var(--down) 14%, transparent); }
+  .pill.unknown { color: var(--unknown); background: color-mix(in srgb, var(--unknown) 14%, transparent); }
+  .flap { color: var(--warn); font: 11px var(--mono); margin-left: 6px; }
+  .bar { display: flex; gap: 2px; height: 26px; align-items: stretch; min-width: 180px; }
+  .bar span { flex: 1; border-radius: 2px; background: var(--line); }
+  .bar span.g { background: var(--up); } .bar span.y { background: var(--warn); } .bar span.r { background: var(--down); }
+  svg.spark { width: 140px; height: 28px; display: block; }
+  svg.spark path { fill: none; stroke: var(--accent); stroke-width: 1.5; }
+  .budget { font-family: var(--mono); }
+  .budget.low { color: var(--warn); } .budget.out { color: var(--down); }
+  .detail { color: var(--muted); font-size: 12px; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .events { max-height: 320px; overflow: auto; }
+  .event { display: grid; grid-template-columns: 150px 1fr; gap: 12px; padding: 9px 16px;
+           border-bottom: 1px solid var(--line); font-size: 13px; }
+  .event time { font: 12px var(--mono); color: var(--muted); }
+  .empty { padding: 24px 16px; color: var(--muted); text-align: center; }
+  .scroll { overflow-x: auto; }
+  @media (max-width: 760px) {
+    header { flex-wrap: wrap; } .hide-sm { display: none; }
+    .event { grid-template-columns: 1fr; gap: 2px; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>VIGIL <span>// network</span></h1>
+  <div class="totals" id="totals"></div>
+  <div class="spacer"></div>
+  <div class="live" id="live"><i></i><span>connecting</span></div>
+  <select id="range" aria-label="Time range">
+    <option value="1h">1h</option><option value="6h">6h</option>
+    <option value="24h" selected>24h</option><option value="7d">7d</option><option value="30d">30d</option>
+  </select>
+</header>
+
+<main>
+  <section class="panel">
+    <h2>Targets</h2>
+    <div class="scroll">
+      <table>
+        <thead><tr>
+          <th>Target</th><th>Status</th><th class="hide-sm">History</th>
+          <th class="num">Now</th><th class="num">p95</th><th class="hide-sm">Latency</th>
+          <th class="num">Uptime</th><th class="num hide-sm">Budget</th><th class="hide-sm">Detail</th>
+        </tr></thead>
+        <tbody id="rows"><tr><td colspan="9" class="empty">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>Events</h2>
+    <div class="events" id="events"><div class="empty">No state changes in this range.</div></div>
+  </section>
+</main>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fmt = (v, d = 1) => v == null ? "—" : Number(v).toFixed(d);
+let range = "24h";
+try { range = localStorage.getItem("vigil.range") || range; } catch {}
+$("#range").value = range;
+
+// Status-page style history: each block is a time bucket, coloured by the
+// worst availability inside it, so a 30-second blip in a 12-minute bucket
+// still shows up instead of averaging away.
+function historyBar(series) {
+  const n = 40;
+  if (!series.length) return `<div class="bar">${"<span></span>".repeat(n)}</div>`;
+  const per = Math.ceil(series.length / n);
+  const blocks = [];
+  for (let i = 0; i < series.length; i += per) {
+    const worst = Math.min(...series.slice(i, i + per).map(b => b.availability));
+    blocks.push(worst >= 100 ? "g" : worst >= 90 ? "y" : "r");
+  }
+  while (blocks.length < n) blocks.unshift("");
+  return `<div class="bar">${blocks.slice(-n).map(c => `<span class="${c}"></span>`).join("")}</div>`;
+}
+
+function sparkline(series) {
+  const pts = series.filter(b => b.latency_max != null);
+  if (pts.length < 2) return "";
+  const w = 140, h = 28, max = Math.max(...pts.map(p => p.latency_max)) || 1;
+  const d = pts.map((p, i) => `${i ? "L" : "M"}${(i / (pts.length - 1) * w).toFixed(1)},${(h - 2 - p.latency_max / max * (h - 4)).toFixed(1)}`).join("");
+  return `<svg class="spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><title>max ${fmt(max)} ms</title><path d="${d}"/></svg>`;
+}
+
+function budgetCell(b) {
+  if (b == null) return "—";
+  const cls = b < 0 ? "out" : b < 25 ? "low" : "";
+  return `<span class="budget ${cls}">${fmt(b, 0)}%</span>`;
+}
+
+async function load() {
+  const [targets, events] = await Promise.all([
+    fetch(`/api/targets?range=${range}`).then(r => r.json()),
+    fetch(`/api/events?range=${range}`).then(r => r.json()),
+  ]);
+  const series = await Promise.all(targets.map(t =>
+    fetch(`/api/targets/${encodeURIComponent(t.name)}/series?range=${range}`).then(r => r.json())));
+
+  const up = targets.filter(t => t.health === "up").length;
+  const down = targets.filter(t => t.health === "down").length;
+  $("#totals").innerHTML = `<span><b>${up}</b> up</span><span><b style="color:var(--down)">${down}</b> down</span><span><b>${targets.length}</b> total</span>`;
+
+  // Down targets first: the table exists to answer "what is broken", not to list things alphabetically.
+  const order = { down: 0, unknown: 1, up: 2 };
+  const rows = targets.map((t, i) => ({ t, s: series[i] })).sort((a, b) => order[a.t.health] - order[b.t.health] || a.t.name.localeCompare(b.t.name));
+  $("#rows").innerHTML = rows.map(({ t, s }) => `
+    <tr data-name="${esc(t.name)}">
+      <td><div class="name">${esc(t.name)}</div><div class="addr">${esc(t.type)} · ${esc(t.address)}</div></td>
+      <td><span class="pill ${t.health}">${t.health}</span>${t.flapping ? '<span class="flap">flapping</span>' : ""}</td>
+      <td class="hide-sm">${historyBar(s)}</td>
+      <td class="num" data-k="now">${t.latency_ms == null ? "—" : fmt(t.latency_ms) + " ms"}</td>
+      <td class="num">${t.summary.p95 == null ? "—" : fmt(t.summary.p95) + " ms"}</td>
+      <td class="hide-sm">${sparkline(s)}</td>
+      <td class="num">${t.summary.availability == null ? "—" : fmt(t.summary.availability, 2) + "%"}</td>
+      <td class="num hide-sm">${budgetCell(t.summary.error_budget_remaining)}</td>
+      <td class="hide-sm"><div class="detail" data-k="detail" title="${esc(t.detail)}">${esc(t.detail)}</div></td>
+    </tr>`).join("") || `<tr><td colspan="9" class="empty">No targets configured.</td></tr>`;
+
+  $("#events").innerHTML = events.length ? events.map(e => `
+    <div class="event"><time>${new Date(e.ts * 1000).toLocaleString()}</time>
+      <div><b>${esc(e.target)}</b> <span class="pill ${e.new}">${e.new}</span> ${esc(e.reason)}${e.flapping ? ' <span class="flap">flapping</span>' : ""}</div></div>`).join("")
+    : `<div class="empty">No state changes in this range.</div>`;
+}
+
+$("#range").addEventListener("change", (e) => {
+  range = e.target.value;
+  try { localStorage.setItem("vigil.range", range); } catch {}
+  load();
+});
+
+// Live: patch the row in place for each probe, and do a full reload only when
+// health changes — re-rendering the whole table every second would reset
+// scroll position and make the page unreadable on a large fleet.
+const es = new EventSource("/api/stream");
+es.onopen = () => { $("#live").className = "live on"; $("#live span").textContent = "live"; };
+es.onerror = () => { $("#live").className = "live"; $("#live span").textContent = "reconnecting"; };
+es.onmessage = (msg) => {
+  const ev = JSON.parse(msg.data);
+  const row = document.querySelector(`tr[data-name="${CSS.escape(ev.target)}"]`);
+  if (!row) return;
+  const pill = row.querySelector(".pill");
+  if (pill && !pill.classList.contains(ev.health)) return load();
+  row.querySelector('[data-k="now"]').textContent = ev.latency_ms == null ? "—" : `${fmt(ev.latency_ms)} ms`;
+  const det = row.querySelector('[data-k="detail"]');
+  if (det) { det.textContent = ev.detail; det.title = ev.detail; }
+  row.classList.remove("flash"); void row.offsetWidth; row.classList.add("flash");
+};
+
+load();
+setInterval(load, 60_000);
+</script>
+</body>
+</html>
