@@ -70,11 +70,13 @@ class Scheduler:
 
         state = self.states[target.name]
         transition = state.observe(result.ok, result.detail, now)
-        if transition:
+        # Startup discovery of a healthy target is not news and would bury real
+        # transitions after every restart; starting out *down* still is.
+        if transition and not (transition.old.value == "unknown" and transition.new.value == "up"):
             self.store.add_event(target.name, transition.old.value, transition.new.value,
                                  transition.reason, transition.flapping, transition.at)
-            if self.on_transition:
-                self.on_transition(transition)
+        if transition and self.on_transition:
+            self.on_transition(transition)
         for listener in self.listeners:
             listener(target.name, result, state)
 

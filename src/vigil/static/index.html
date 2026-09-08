@@ -59,7 +59,7 @@
   .budget.low { color: var(--warn); } .budget.out { color: var(--down); }
   .detail { color: var(--muted); font-size: 12px; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .events { max-height: 320px; overflow: auto; }
-  .event { display: grid; grid-template-columns: 150px 1fr; gap: 12px; padding: 9px 16px;
+  .event { display: grid; grid-template-columns: 170px 1fr; align-items: center; gap: 12px; padding: 9px 16px;
            border-bottom: 1px solid var(--line); font-size: 13px; }
   .event time { font: 12px var(--mono); color: var(--muted); }
   .empty { padding: 24px 16px; color: var(--muted); text-align: center; }
@@ -137,8 +137,10 @@ function sparkline(series) {
 
 function budgetCell(b) {
   if (b == null) return "—";
-  const cls = b < 0 ? "out" : b < 25 ? "low" : "";
-  return `<span class="budget ${cls}">${fmt(b, 0)}%</span>`;
+  // Past zero the exact overspend (-1200%) is noise; what matters is that
+  // the SLO is already breached for this window.
+  if (b < 0) return `<span class="budget out" title="${fmt(b, 0)}%">exhausted</span>`;
+  return `<span class="budget ${b < 25 ? "low" : ""}">${fmt(b, 0)}%</span>`;
 }
 
 async function load() {
@@ -170,7 +172,7 @@ async function load() {
     </tr>`).join("") || `<tr><td colspan="9" class="empty">No targets configured.</td></tr>`;
 
   $("#events").innerHTML = events.length ? events.map(e => `
-    <div class="event"><time>${new Date(e.ts * 1000).toLocaleString()}</time>
+    <div class="event"><time>${new Date(e.ts * 1000).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit" })}</time>
       <div><b>${esc(e.target)}</b> <span class="pill ${e.new}">${e.new}</span> ${esc(e.reason)}${e.flapping ? ' <span class="flap">flapping</span>' : ""}</div></div>`).join("")
     : `<div class="empty">No state changes in this range.</div>`;
 }
