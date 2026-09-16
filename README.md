@@ -2,6 +2,8 @@
 
 **Self-hosted network monitoring in a single process.** Async ICMP, TCP, HTTP and DNS probes; flap-resistant alerting; SLO and error-budget tracking; Prometheus metrics; and a live dashboard — no database server, no agents, no root.
 
+![Vigil dashboard](docs/dashboard.png)
+
 ```
             ┌──────────────── vigil (one asyncio process) ────────────────┐
 targets ──▶ │ scheduler ─▶ probes ─▶ state machine ─▶ notifier ─▶ webhooks │
