@@ -1,5 +1,10 @@
 # Vigil
 
+[![CI](https://github.com/Jamie-233/vigil/actions/workflows/ci.yml/badge.svg)](https://github.com/Jamie-233/vigil/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue.svg?logo=python&logoColor=white)](pyproject.toml)
+[![Stars](https://img.shields.io/github/stars/Jamie-233/vigil.svg?style=flat&color=yellow)](https://github.com/Jamie-233/vigil/stargazers)
+
 **Self-hosted network monitoring in a single process.** Async ICMP, TCP, HTTP and DNS probes; flap-resistant alerting; SLO and error-budget tracking; Prometheus metrics; and a live dashboard — no database server, no agents, no root.
 
 ![Vigil dashboard](docs/dashboard.png)
