@@ -43,7 +43,8 @@ class Scheduler:
         self.listeners: list[Listener] = []
         self.counters: dict[str, dict[str, int]] = {t.name: {"ok": 0, "fail": 0} for t in config.targets}
         self._sem = asyncio.Semaphore(config.max_concurrency)
-        self._tasks: list[asyncio.Task] = []
+        self._tasks: dict[str, asyncio.Task] = {}
+        self._running = False
 
     async def run_once(self, target: Target) -> ProbeResult:
         probe = self.probes[target.type]
@@ -92,10 +93,34 @@ class Scheduler:
             if loop.time() - next_due > target.interval:
                 next_due = loop.time() + target.interval
 
+    def _spawn(self, target: Target) -> None:
+        self._tasks[target.name] = asyncio.create_task(self._loop(target), name=f"probe:{target.name}")
+
     def start(self) -> None:
-        self._tasks = [asyncio.create_task(self._loop(t), name=f"probe:{t.name}") for t in self.config.targets]
+        self._running = True
+        for t in self.config.targets:
+            self._spawn(t)
+
+    def add(self, target: Target) -> None:
+        """Start probing a target while running. Its state starts from UNKNOWN."""
+        self.config.targets.append(target)
+        self.states[target.name] = TargetState(target.name, target.fail_after, target.recover_after)
+        self.counters[target.name] = {"ok": 0, "fail": 0}
+        if self._running:
+            self._spawn(target)
+
+    def remove(self, name: str) -> None:
+        """Stop probing a target. Its stored history is kept."""
+        task = self._tasks.pop(name, None)
+        if task:
+            task.cancel()
+        self.config.targets = [t for t in self.config.targets if t.name != name]
+        for d in (self.states, self.counters, self.latest):
+            d.pop(name, None)
 
     async def stop(self) -> None:
-        for task in self._tasks:
+        self._running = False
+        tasks = list(self._tasks.values())
+        for task in tasks:
             task.cancel()
-        await asyncio.gather(*self._tasks, return_exceptions=True)
+        await asyncio.gather(*tasks, return_exceptions=True)

@@ -41,6 +41,7 @@ Ping-based monitors answer one question — *is it routed?* — and alert on eve
 | **Alerting** | Slack, Discord or raw JSON webhooks; queue-isolated from probing; exponential backoff; honours `Retry-After` |
 | **Prometheus** | `/metrics` with counters for success/failure, debounced `up`, latency, flapping and certificate expiry |
 | **Dashboard** | live over Server-Sent Events, status-page history bars, latency sparklines, down targets sorted first |
+| **Editable from the dashboard** | add, edit and remove targets in the browser; changes are validated, written back to the YAML atomically and applied without a restart. Only accepted from the local machine |
 | **Smoke tests** | `vigil check` probes everything once and exits non-zero on failure — a post-change verification step |
 
 ## Quick start
@@ -100,6 +101,7 @@ targets:
 | `GET /api/events?range=7d` | state transitions |
 | `GET /api/stream` | live probe results as Server-Sent Events |
 | `GET /metrics` | Prometheus exposition |
+| `POST /api/targets`, `PUT` / `DELETE /api/targets/{name}` | edit targets; loopback only, needs the `X-Vigil: 1` header |
 
 ## Design notes
 

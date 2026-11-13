@@ -31,7 +31,7 @@ async def _run(config_path: str) -> None:
     notifier = Notifier(config.webhooks)
     scheduler = Scheduler(config, store, on_transition=notifier.notify)
 
-    app = build_app(scheduler, store)
+    app = build_app(scheduler, store, config_path)
     runner = web.AppRunner(app)
     await runner.setup()
     host, _, port = config.listen.rpartition(":")

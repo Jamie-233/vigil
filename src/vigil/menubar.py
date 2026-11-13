@@ -65,17 +65,23 @@ def run(config_path: str) -> None:
             except Exception:
                 pass
             self.proc: subprocess.Popen | None = None
-            self.items = {t.name: rumps.MenuItem(t.name) for t in config.targets}
             self.login = rumps.MenuItem("Launch at Login", callback=self.toggle_login)
             self.login.state = int(AGENT.exists())
+            self.build([t.name for t in config.targets])
+            self.start_monitor()
+            rumps.Timer(self.refresh, POLL_SECONDS).start()
+
+        def build(self, names: list[str]) -> None:
+            # Targets can be added or removed from the dashboard, so the
+            # menu is rebuilt whenever the set of names changes.
+            self.items = {n: rumps.MenuItem(n) for n in names}
+            self.menu.clear()
             self.menu = [
                 *self.items.values(), None,
                 rumps.MenuItem("Open Dashboard", callback=lambda _: webbrowser.open(base)),
                 self.login, None,
                 rumps.MenuItem("Quit Vigil", callback=self.quit),
             ]
-            self.start_monitor()
-            rumps.Timer(self.refresh, POLL_SECONDS).start()
 
         def start_monitor(self) -> None:
             self.proc = subprocess.Popen(
@@ -93,6 +99,8 @@ def run(config_path: str) -> None:
                 self.title = "○ Vigil"
                 return
             self.title = _title(targets)
+            if [t["name"] for t in targets] != list(self.items):
+                self.build([t["name"] for t in targets])
             for t in targets:
                 if t["name"] in self.items:
                     self.items[t["name"]].title = _line(t)

@@ -64,6 +64,26 @@
   .event time { font: 12px var(--mono); color: var(--muted); }
   .empty { padding: 24px 16px; color: var(--muted); text-align: center; }
   .scroll { overflow-x: auto; }
+  .panel h2.bar-h { display: flex; align-items: center; justify-content: space-between; }
+  button { font: 12px var(--mono); color: var(--text); background: transparent; border: 1px solid var(--line);
+           border-radius: 6px; padding: 4px 10px; cursor: pointer; }
+  button:hover { border-color: var(--accent); color: var(--accent); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.danger:hover { border-color: var(--down); color: var(--down); }
+  td.act { white-space: nowrap; text-align: right; }
+  td.act button { padding: 2px 8px; margin-left: 4px; }
+  dialog { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 10px;
+           padding: 0; width: min(440px, 92vw); }
+  dialog::backdrop { background: rgb(0 0 0 / .45); }
+  dialog form { display: grid; gap: 12px; padding: 18px; }
+  dialog h3 { margin: 0; font: 600 13px var(--mono); letter-spacing: .06em; }
+  dialog label { display: grid; gap: 4px; font: 11px var(--mono); color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+  dialog input, dialog select { width: 100%; background: var(--bg); color: var(--text); border: 1px solid var(--line);
+           border-radius: 6px; padding: 7px 9px; font: 13px var(--mono); text-transform: none; letter-spacing: 0; }
+  dialog .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  dialog .err { color: var(--down); font: 12px var(--mono); min-height: 1em; }
+  dialog .btns { display: flex; justify-content: flex-end; gap: 8px; }
+  [data-for] { display: none; }
   @media (max-width: 760px) {
     header { flex-wrap: wrap; } .hide-sm { display: none; }
     .event { grid-template-columns: 1fr; gap: 2px; }
@@ -84,15 +104,15 @@
 
 <main>
   <section class="panel">
-    <h2>Targets</h2>
+    <h2 class="bar-h">Targets <button id="add" hidden>+ add</button></h2>
     <div class="scroll">
       <table>
         <thead><tr>
           <th>Target</th><th>Status</th><th class="hide-sm">History</th>
           <th class="num">Now</th><th class="num">p95</th><th class="hide-sm">Latency</th>
-          <th class="num">Uptime</th><th class="num hide-sm">Budget</th><th class="hide-sm">Detail</th>
+          <th class="num">Uptime</th><th class="num hide-sm">Budget</th><th class="hide-sm">Detail</th><th></th>
         </tr></thead>
-        <tbody id="rows"><tr><td colspan="9" class="empty">Loading…</td></tr></tbody>
+        <tbody id="rows"><tr><td colspan="10" class="empty">Loading…</td></tr></tbody>
       </table>
     </div>
   </section>
@@ -103,11 +123,31 @@
   </section>
 </main>
 
+<dialog id="dlg">
+  <form method="dialog" id="form">
+    <h3 id="dlg-title">Add target</h3>
+    <label>Name <input name="name" required pattern="[A-Za-z0-9][A-Za-z0-9._\-]{0,63}" placeholder="my-site"></label>
+    <div class="row2">
+      <label>Type <select name="type"><option>http</option><option>tcp</option><option>icmp</option><option>dns</option></select></label>
+      <label>Interval (s) <input name="interval" type="number" min="10" value="60"></label>
+    </div>
+    <label>Address <input name="address" required placeholder="https://example.com/"></label>
+    <label data-for="http">Page must contain <input name="expect_body" placeholder="optional"></label>
+    <div class="row2" data-for="dns">
+      <label>Resolver <input name="server" placeholder="1.1.1.1"></label>
+      <label>Record <select name="record"><option>A</option><option>AAAA</option><option>CNAME</option><option>MX</option><option>TXT</option></select></label>
+    </div>
+    <div class="err" id="dlg-err"></div>
+    <div class="btns"><button value="cancel" formnovalidate>Cancel</button><button class="primary" id="save" value="save">Save</button></div>
+  </form>
+</dialog>
+
 <script>
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const fmt = (v, d = 1) => v == null ? "—" : Number(v).toFixed(d);
 let range = "24h";
+let editable = false, current = {}, editing = null;
 try { range = localStorage.getItem("vigil.range") || range; } catch {}
 $("#range").value = range;
 
@@ -169,7 +209,9 @@ async function load() {
       <td class="num">${t.summary.availability == null ? "—" : fmt(t.summary.availability, 2) + "%"}</td>
       <td class="num hide-sm">${budgetCell(t.summary.error_budget_remaining)}</td>
       <td class="hide-sm"><div class="detail" data-k="detail" title="${esc(t.detail)}">${esc(t.detail)}</div></td>
-    </tr>`).join("") || `<tr><td colspan="9" class="empty">No targets configured.</td></tr>`;
+      <td class="act">${editable ? `<button data-edit="${esc(t.name)}">edit</button><button class="danger" data-del="${esc(t.name)}">×</button>` : ""}</td>
+    </tr>`).join("") || `<tr><td colspan="10" class="empty">No targets configured.</td></tr>`;
+  current = Object.fromEntries(targets.map(t => [t.name, t]));
 
   $("#events").innerHTML = events.length ? events.map(e => `
     <div class="event"><time>${new Date(e.ts * 1000).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit" })}</time>
@@ -201,7 +243,57 @@ es.onmessage = (msg) => {
   row.classList.remove("flash"); void row.offsetWidth; row.classList.add("flash");
 };
 
-load();
+
+// Editing. Only offered when the server says it was started from a config
+// file; every write sends X-Vigil so other sites' pages can't make the request.
+const form = $("#form"), dlg = $("#dlg");
+function showFields() {
+  const type = form.type.value;
+  document.querySelectorAll("[data-for]").forEach(el => el.style.display = el.dataset.for === type ? "grid" : "none");
+  form.address.placeholder = { http: "https://example.com/", tcp: "example.com:443", icmp: "192.0.2.1", dns: "example.com" }[type];
+}
+form.type.addEventListener("change", showFields);
+function openDialog(t) {
+  editing = t ? t.name : null;
+  form.reset();
+  $("#dlg-title").textContent = t ? `Edit ${t.name}` : "Add target";
+  $("#dlg-err").textContent = "";
+  if (t) {
+    form.name.value = t.name; form.type.value = t.type; form.address.value = t.address; form.interval.value = t.interval;
+    form.expect_body.value = t.options.expect_body || ""; form.server.value = t.options.server || ""; form.record.value = t.options.record || "A";
+  }
+  showFields();
+  dlg.showModal();
+}
+async function api(method, path, body) {
+  const r = await fetch(path, { method, headers: { "X-Vigil": "1", "Content-Type": "application/json" }, body: body && JSON.stringify(body) });
+  if (!r.ok) { let m = await r.text(); try { m = JSON.parse(m).error; } catch {} throw new Error(m || r.statusText); }
+}
+form.addEventListener("submit", async (e) => {
+  if (e.submitter?.value !== "save") return;
+  e.preventDefault();
+  const f = form, type = f.type.value, prev = editing ? current[editing] : null;
+  const options = { ...(prev && prev.type === type ? prev.options : {}) };
+  if (type === "http") { options.expect_body = f.expect_body.value.trim(); }
+  if (type === "dns") { options.server = f.server.value.trim(); options.record = f.record.value; }
+  const interval = Number(f.interval.value) || 60;
+  const body = { name: f.name.value.trim(), type, address: f.address.value.trim(), interval,
+                 timeout: prev ? Math.min(prev.timeout, interval - 1) : Math.min(10, interval - 1), options,
+                 labels: prev ? prev.labels : {} };
+  try {
+    await api(editing ? "PUT" : "POST", editing ? `/api/targets/${encodeURIComponent(editing)}` : "/api/targets", body);
+    dlg.close(); load();
+  } catch (err) { $("#dlg-err").textContent = err.message; }
+});
+$("#add").addEventListener("click", () => openDialog(null));
+$("#rows").addEventListener("click", async (e) => {
+  const edit = e.target.dataset.edit, del = e.target.dataset.del;
+  if (edit) openDialog(current[edit]);
+  if (del && confirm(`Stop monitoring ${del}? Its history is kept.`)) {
+    try { await api("DELETE", `/api/targets/${encodeURIComponent(del)}`); load(); } catch (err) { alert(err.message); }
+  }
+});
+fetch("/healthz").then(r => r.json()).then(h => { editable = !!h.editable; $("#add").hidden = !editable; load(); });
 setInterval(load, 60_000);
 </script>
 </body>
