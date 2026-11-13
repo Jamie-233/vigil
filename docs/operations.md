@@ -27,3 +27,4 @@ Template: [`deploy/targets.example.yml`](../deploy/targets.example.yml) · Insta
 | Date | Event | Cause | Change |
 |---|---|---|---|
 | 2026-11-13 | Website shown DOWN right after the first start, then HTTP 200 in 659 ms on the next probe | The first probe timed out (10 s). The startup rule let a single sample set the state, so one failure meant DOWN, and it then needed 2 successes to recover | At startup, DOWN now needs `fail_after` consecutive failures like any other time. Why the first connection was slow is not known yet |
+| 2026-11-13 | Website: 4 of 9 probes timed out (10 s) in the first hour; successful ones took 0.7–3.0 s. Never 3 failures in a row, so it stayed UP and no alert fired | DNS points to a mainland China CDN node; probes run from Japan. Not confirmed yet | None to Vigil. Hysteresis worked as intended; the site itself needs a closer CDN node |
