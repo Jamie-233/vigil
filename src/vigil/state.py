@@ -61,9 +61,13 @@ class TargetState:
 
         new = self.health
         if self.health is Health.UNKNOWN:
-            # On startup we have no history, so the first sample decides; making
-            # a fresh process wait N intervals before showing anything is worse.
-            new = Health.UP if ok else Health.DOWN
+            # On startup there is no history. One success is enough to show UP,
+            # but DOWN still needs fail_after consecutive failures: otherwise a
+            # single slow first connection after every restart reads as an outage.
+            if ok:
+                new = Health.UP
+            elif self.consecutive_fail >= self.fail_after:
+                new = Health.DOWN
         elif self.health is Health.UP and self.consecutive_fail >= self.fail_after:
             new = Health.DOWN
         elif self.health is Health.DOWN and self.consecutive_ok >= self.recover_after:

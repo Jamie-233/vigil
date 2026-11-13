@@ -26,3 +26,4 @@ Template: [`deploy/targets.example.yml`](../deploy/targets.example.yml) · Insta
 
 | Date | Event | Cause | Change |
 |---|---|---|---|
+| 2026-11-13 | Website shown DOWN right after the first start, then HTTP 200 in 659 ms on the next probe | The first probe timed out (10 s). The startup rule let a single sample set the state, so one failure meant DOWN, and it then needed 2 successes to recover | At startup, DOWN now needs `fail_after` consecutive failures like any other time. Why the first connection was slow is not known yet |

@@ -13,9 +13,23 @@ def feed(state, pattern, start=0.0, step=10.0):
     return transitions
 
 
-def test_first_sample_decides_initial_state():
+def test_first_success_shows_up_immediately():
     s = TargetState("t", fail_after=3, recover_after=2)
-    [tr] = feed(s, "0")
+    [tr] = feed(s, "1")
+    assert (tr.old, tr.new) == (Health.UNKNOWN, Health.UP)
+
+
+def test_single_failure_at_startup_does_not_mark_down():
+    s = TargetState("t", fail_after=3, recover_after=2)
+    assert feed(s, "0") == []
+    assert s.health is Health.UNKNOWN
+    [tr] = feed(s, "1")
+    assert (tr.old, tr.new) == (Health.UNKNOWN, Health.UP)
+
+
+def test_startup_goes_down_after_fail_after_failures():
+    s = TargetState("t", fail_after=3, recover_after=2)
+    [tr] = feed(s, "000")
     assert (tr.old, tr.new) == (Health.UNKNOWN, Health.DOWN)
 
 
