@@ -70,8 +70,8 @@
   button:hover { border-color: var(--accent); color: var(--accent); }
   button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
   button.danger:hover { border-color: var(--down); color: var(--down); }
-  td.act { white-space: nowrap; text-align: right; }
-  td.act button { padding: 2px 8px; margin-left: 4px; }
+  .act { margin-left: 8px; white-space: nowrap; }
+  .act button { padding: 1px 7px; margin-right: 4px; font-size: 11px; }
   dialog { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 10px;
            padding: 0; width: min(440px, 92vw); }
   dialog::backdrop { background: rgb(0 0 0 / .45); }
@@ -110,9 +110,9 @@
         <thead><tr>
           <th>Target</th><th>Status</th><th class="hide-sm">History</th>
           <th class="num">Now</th><th class="num">p95</th><th class="hide-sm">Latency</th>
-          <th class="num">Uptime</th><th class="num hide-sm">Budget</th><th class="hide-sm">Detail</th><th></th>
+          <th class="num">Uptime</th><th class="num hide-sm">Budget</th><th class="hide-sm">Detail</th>
         </tr></thead>
-        <tbody id="rows"><tr><td colspan="10" class="empty">Loading…</td></tr></tbody>
+        <tbody id="rows"><tr><td colspan="9" class="empty">Loading…</td></tr></tbody>
       </table>
     </div>
   </section>
@@ -138,7 +138,7 @@
       <label>Record <select name="record"><option>A</option><option>AAAA</option><option>CNAME</option><option>MX</option><option>TXT</option></select></label>
     </div>
     <div class="err" id="dlg-err"></div>
-    <div class="btns"><button value="cancel" formnovalidate>Cancel</button><button class="primary" id="save" value="save">Save</button></div>
+    <div class="btns"><button type="button" class="danger" id="dlg-del" style="margin-right:auto">Delete</button><button value="cancel" formnovalidate>Cancel</button><button class="primary" id="save" value="save">Save</button></div>
   </form>
 </dialog>
 
@@ -200,7 +200,7 @@ async function load() {
   const rows = targets.map((t, i) => ({ t, s: series[i] })).sort((a, b) => order[a.t.health] - order[b.t.health] || a.t.name.localeCompare(b.t.name));
   $("#rows").innerHTML = rows.map(({ t, s }) => `
     <tr data-name="${esc(t.name)}">
-      <td><div class="name">${esc(t.name)}</div><div class="addr">${esc(t.type)} · ${esc(t.address)}</div></td>
+      <td><div class="name">${esc(t.name)}${editable ? `<span class="act"><button data-edit="${esc(t.name)}">edit</button><button class="danger" data-del="${esc(t.name)}">delete</button></span>` : ""}</div><div class="addr">${esc(t.type)} · ${esc(t.address)}</div></td>
       <td><span class="pill ${t.health}">${t.health}</span>${t.flapping ? '<span class="flap">flapping</span>' : ""}</td>
       <td class="hide-sm">${historyBar(s)}</td>
       <td class="num" data-k="now">${t.latency_ms == null ? "—" : fmt(t.latency_ms) + " ms"}</td>
@@ -209,8 +209,7 @@ async function load() {
       <td class="num">${t.summary.availability == null ? "—" : fmt(t.summary.availability, 2) + "%"}</td>
       <td class="num hide-sm">${budgetCell(t.summary.error_budget_remaining)}</td>
       <td class="hide-sm"><div class="detail" data-k="detail" title="${esc(t.detail)}">${esc(t.detail)}</div></td>
-      <td class="act">${editable ? `<button data-edit="${esc(t.name)}">edit</button><button class="danger" data-del="${esc(t.name)}">×</button>` : ""}</td>
-    </tr>`).join("") || `<tr><td colspan="10" class="empty">No targets configured.</td></tr>`;
+    </tr>`).join("") || `<tr><td colspan="9" class="empty">No targets configured.</td></tr>`;
   current = Object.fromEntries(targets.map(t => [t.name, t]));
 
   $("#events").innerHTML = events.length ? events.map(e => `
@@ -262,6 +261,7 @@ function openDialog(t) {
     form.name.value = t.name; form.type.value = t.type; form.address.value = t.address; form.interval.value = t.interval;
     form.expect_body.value = t.options.expect_body || ""; form.server.value = t.options.server || ""; form.record.value = t.options.record || "A";
   }
+  $("#dlg-del").hidden = !t;
   showFields();
   dlg.showModal();
 }
@@ -285,13 +285,17 @@ form.addEventListener("submit", async (e) => {
     dlg.close(); load();
   } catch (err) { $("#dlg-err").textContent = err.message; }
 });
+async function removeTarget(name) {
+  if (!confirm(`Stop monitoring ${name}? Its history is kept.`)) return false;
+  try { await api("DELETE", `/api/targets/${encodeURIComponent(name)}`); load(); return true; }
+  catch (err) { alert(err.message); return false; }
+}
+$("#dlg-del").addEventListener("click", async () => { if (await removeTarget(editing)) dlg.close(); });
 $("#add").addEventListener("click", () => openDialog(null));
 $("#rows").addEventListener("click", async (e) => {
   const edit = e.target.dataset.edit, del = e.target.dataset.del;
   if (edit) openDialog(current[edit]);
-  if (del && confirm(`Stop monitoring ${del}? Its history is kept.`)) {
-    try { await api("DELETE", `/api/targets/${encodeURIComponent(del)}`); load(); } catch (err) { alert(err.message); }
-  }
+  if (del) removeTarget(del);
 });
 fetch("/healthz").then(r => r.json()).then(h => { editable = !!h.editable; $("#add").hidden = !editable; load(); });
 setInterval(load, 60_000);
