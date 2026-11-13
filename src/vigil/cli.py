@@ -83,7 +83,8 @@ def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(prog="vigil", description="Self-hosted network monitoring")
     parser.add_argument("-v", "--verbose", action="store_true")
     sub = parser.add_subparsers(dest="cmd", required=True)
-    for name, help_text in (("run", "start the monitor and dashboard"), ("check", "probe every target once")):
+    for name, help_text in (("run", "start the monitor and dashboard"), ("check", "probe every target once"),
+                            ("menubar", "macOS: run the monitor from the menu bar")):
         p = sub.add_parser(name, help=help_text)
         p.add_argument("-c", "--config", default="vigil.yml")
     args = parser.parse_args(argv)
@@ -93,6 +94,14 @@ def main(argv: list[str] | None = None) -> None:
     try:
         if args.cmd == "run":
             asyncio.run(_run(args.config))
+        elif args.cmd == "menubar":
+            if sys.platform != "darwin":
+                sys.exit("vigil menubar only runs on macOS")
+            try:
+                from .menubar import run as run_menubar
+            except ImportError:
+                sys.exit("menu bar support is not installed: pip install 'vigil[macos]'")
+            run_menubar(args.config)
         else:
             sys.exit(asyncio.run(_check(args.config)))
     except ConfigError as exc:

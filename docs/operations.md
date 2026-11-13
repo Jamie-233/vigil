@@ -4,7 +4,7 @@ Vigil monitors real services from a Mac mini on a home connection. This file
 records what it watches, why, and what happens while it runs: incidents,
 false alarms, and every change to thresholds or code that running it forced.
 
-Template: [`deploy/targets.example.yml`](../deploy/targets.example.yml) · Install: `bash deploy/macos/install.sh`. The real target list stays on the monitoring host (`~/.vigil/vigil.yml`) and is not published.
+Template: [`deploy/targets.example.yml`](../deploy/targets.example.yml) · Install: `bash deploy/macos/install.sh` (runs from the menu bar; start at login is opt-in). The real target list stays on the monitoring host (`~/.vigil/vigil.yml`) and is not published.
 
 ## What is monitored
 

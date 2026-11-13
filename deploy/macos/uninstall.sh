@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Stop and remove the launchd agent. Data in ~/.vigil is kept.
+# Quit Vigil and remove its login item, if enabled. Data in ~/.vigil is kept.
 set -euo pipefail
-LABEL="io.github.jamie-233.vigil"
-launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
-rm -f "$HOME/Library/LaunchAgents/$LABEL.plist"
+pkill -f "vigil.cli menubar" 2>/dev/null || true
+pkill -f "vigil.cli run" 2>/dev/null || true
+rm -f "$HOME/Library/LaunchAgents/io.github.jamie-233.vigil.menubar.plist"
 echo "Stopped. History is still in ~/.vigil/vigil.db"

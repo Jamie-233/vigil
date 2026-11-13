@@ -1,11 +1,10 @@
 #!/usr/bin/env bash
-# Install Vigil as a launchd agent on macOS: starts at login, restarts on crash.
+# Install Vigil and start it in the menu bar. Nothing is added to login items;
+# "Launch at Login" is a toggle in the menu.
 set -euo pipefail
 
 REPO="$(cd "$(dirname "$0")/../.." && pwd)"
 HOME_DIR="$HOME/.vigil"
-LABEL="io.github.jamie-233.vigil"
-PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
 
 # Use $PYTHON if set, otherwise the newest python3.x found on PATH or in Homebrew.
 PY="${PYTHON:-}"
@@ -22,10 +21,10 @@ if [ -z "$PY" ]; then
   exit 1
 fi
 
-mkdir -p "$HOME_DIR" "$HOME/Library/LaunchAgents"
+mkdir -p "$HOME_DIR"
 [ -d "$HOME_DIR/venv" ] || "$PY" -m venv "$HOME_DIR/venv"
 "$HOME_DIR/venv/bin/pip" install -q --upgrade pip
-"$HOME_DIR/venv/bin/pip" install -q "$REPO"
+"$HOME_DIR/venv/bin/pip" install -q "$REPO[macos]"
 
 # The config is local only and is never overwritten. Pass a file to use it:
 #   bash install.sh path/to/vigil.yml
@@ -41,32 +40,16 @@ fi
 echo "One-shot check of every target:"
 (cd "$HOME_DIR" && "$HOME_DIR/venv/bin/vigil" check -c vigil.yml) || true
 
-cat > "$PLIST" <<PLIST
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-  <key>Label</key><string>$LABEL</string>
-  <key>ProgramArguments</key>
-  <array>
-    <string>$HOME_DIR/venv/bin/vigil</string>
-    <string>run</string>
-    <string>-c</string>
-    <string>$HOME_DIR/vigil.yml</string>
-  </array>
-  <key>WorkingDirectory</key><string>$HOME_DIR</string>
-  <key>RunAtLoad</key><true/>
-  <key>KeepAlive</key><true/>
-  <key>StandardOutPath</key><string>$HOME_DIR/vigil.log</string>
-  <key>StandardErrorPath</key><string>$HOME_DIR/vigil.log</string>
-</dict>
-</plist>
-PLIST
+# Older versions installed a background service; remove it.
+launchctl bootout "gui/$(id -u)/io.github.jamie-233.vigil" 2>/dev/null || true
+rm -f "$HOME/Library/LaunchAgents/io.github.jamie-233.vigil.plist"
 
-launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
-launchctl bootstrap "gui/$(id -u)" "$PLIST"
+pkill -f "vigil.cli menubar" 2>/dev/null || true
+pkill -f "vigil.cli run" 2>/dev/null || true
+sleep 1
+nohup "$HOME_DIR/venv/bin/python" -m vigil.cli menubar -c "$HOME_DIR/vigil.yml" \
+  >>"$HOME_DIR/menubar.log" 2>&1 &
+disown
 
 echo
-echo "Vigil is running: http://127.0.0.1:8080"
-echo "Logs: $HOME_DIR/vigil.log"
-echo "Keep the Mac awake: System Settings > Energy > Prevent automatic sleeping."
+echo "Vigil is in the menu bar. Dashboard: http://127.0.0.1:8080"
