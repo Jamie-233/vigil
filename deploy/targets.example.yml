@@ -1,0 +1,72 @@
+# Template for a deployment. The installer copies it to ~/.vigil/vigil.yml
+# on first run; edit the addresses there. The real config never lives in
+# this repository.
+
+defaults:
+  interval: 60
+  timeout: 10
+  fail_after: 3
+  recover_after: 2
+
+database: vigil.db
+retention_days: 120
+listen: 127.0.0.1:8080
+
+targets:
+  # Control targets. If these fail together with everything else, the
+  # problem is the local uplink, not the services.
+  - name: uplink-cloudflare
+    type: icmp
+    address: 1.1.1.1
+    interval: 30
+    labels: { role: control }
+
+  - name: uplink-google
+    type: icmp
+    address: 8.8.8.8
+    interval: 30
+    labels: { role: control }
+
+  # A website behind a CDN.
+  - name: site-web
+    type: http
+    address: https://site.example.com/
+    availability_slo: 99.5
+    latency_slo_ms: 1500
+    labels: { role: service }
+    options: { expect_status: [200], cert_warn_days: 21 }
+
+  - name: site-dns
+    type: dns
+    address: site.example.com
+    interval: 300
+    labels: { role: service }
+    options: { server: 1.1.1.1, record: A }
+
+  # An app with no health endpoint, so the front page is the check.
+  - name: app-web
+    type: http
+    address: https://app.example.org/
+    availability_slo: 99.5
+    latency_slo_ms: 1500
+    labels: { role: service }
+    options: { expect_status: [200], cert_warn_days: 21 }
+
+  # If the hostname depends on a third-party DNS provider, that provider is
+  # its own failure domain, so it gets a separate check.
+  - name: app-dns
+    type: dns
+    address: app.example.org
+    interval: 300
+    labels: { role: service }
+    options: { server: 1.1.1.1, record: A }
+
+  # A system someone else runs that you depend on. Check it gently
+  # (every 5 minutes, front page only, never logged in).
+  - name: external-portal
+    type: http
+    address: https://portal.example.net/
+    interval: 300
+    availability_slo: 99.0
+    labels: { role: external }
+    options: { expect_status: [200] }
