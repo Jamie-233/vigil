@@ -7,8 +7,17 @@ HOME_DIR="$HOME/.vigil"
 LABEL="io.github.jamie-233.vigil"
 PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
 
-PY="$(command -v python3 || true)"
-if [ -z "$PY" ] || ! "$PY" -c 'import sys; sys.exit(sys.version_info < (3, 10))'; then
+# Use $PYTHON if set, otherwise the newest python3.x found on PATH or in Homebrew.
+PY="${PYTHON:-}"
+if [ -z "$PY" ]; then
+  for c in python3.14 python3.13 python3.12 python3.11 python3.10 \
+           /opt/homebrew/bin/python3.1{4,3,2,1,0} /usr/local/bin/python3.1{4,3,2,1,0} python3; do
+    if command -v "$c" >/dev/null 2>&1 && "$c" -c 'import sys; sys.exit(sys.version_info < (3, 10))' 2>/dev/null; then
+      PY="$(command -v "$c")"; break
+    fi
+  done
+fi
+if [ -z "$PY" ]; then
   echo "Python 3.10+ is required (brew install python)." >&2
   exit 1
 fi
